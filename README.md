@@ -22,4 +22,6 @@ To reprogram the board with OTA simply open the mailbox door so the empty switch
 - mqttTopicDebug     "mailcam/debug"      See debug messages here
 - mqttTopicReset     "mailcam/reset"      Reset the board
 - mqttTopicBattery   "mailcam/battery"    Battery state is reported here
+- mqttTopicSnapshot  "mailcam/snapshot"   Set to "on" to take new picture and upload it next time we wakeup to report battery
+                                          The topic is reset back to off when picture is taken
 
