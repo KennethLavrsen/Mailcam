@@ -1,5 +1,5 @@
 /* Using special Kenneth ESP32-CAM board
-In ....../esp32/hardware/esp32/1.0.4/boards.txt
+In ~arduino-1.8.X/portable/packages/esp32/hardware/esp32/1.0.4/boards.txt
 Add this extra board to the end
 ##############################################################
 
@@ -76,6 +76,7 @@ const char* mqttTopicDebugSet = "mailcam/debug/set";
 const char* mqttTopicDebug    = "mailcam/debug";
 const char* mqttTopicReset    = "mailcam/reset";
 const char* mqttTopicBattery  = "mailcam/battery";
+const char* mqttTopicSnapshot = "mailcam/snapshot";
 
 // Host name and OTA password
 const char* hostName    = "mailcam";
@@ -86,7 +87,7 @@ const char *post_url = MAILCAM_URL;
 
 // Define debug and normal wakeup intervals
 #define REPORT_INTERVAL_DEBUG   1200  /* Debug interval is 20 minutes */
-#define REPORT_INTERVAL_NORMAL 28800  /* Normal interval is 8 hours */
+#define REPORT_INTERVAL_NORMAL  7200  /* Normal interval is 2 hours */
 
 // CAMERA_MODEL_AI_THINKER
 #define PWDN_GPIO_NUM     32
@@ -123,6 +124,7 @@ unsigned long mqttReconnectTimer = 0;
 bool debugMode = false;
 bool arrivalOpen = false;
 bool emptyOpen = false;
+bool snapshot = false;
 long current_millis;
 long last_capture_millis = 0;
 RTC_DATA_ATTR uint32_t bootCount = 0; //times restarted
@@ -312,6 +314,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         }
     }
 
+    if ( strcmp(topicCopy, mqttTopicSnapshot) == 0 ) {
+        if ( strcmp(message, "on") == 0 ) {
+            snapshot = true;
+        }
+    }
+
 }
 
 bool mqttConnect() {
@@ -323,6 +331,7 @@ bool mqttConnect() {
         client.publish(mqttTopicAnnounce, "connected");
         client.subscribe(mqttTopicReset);
         client.subscribe(mqttTopicDebugSet);
+        client.subscribe(mqttTopicSnapshot);
     }
 
     return client.connected();
@@ -395,7 +404,7 @@ void loop()
         client.publish("mailserver/stateless", "on", false);   //Signal HA to announce mail
         take_send_photo();
         if ( debugMode ) client.publish(mqttTopicDebug, "Photo and sleep");
-        delay(1000);
+        delay(2000);
         deepSleep();
     }
 
@@ -403,13 +412,21 @@ void loop()
         if ( debugMode ) client.publish("mailcam/mail", "empty");
         client.publish("mailserver/set", "off", false);
         client.publish("mailserver/state", "off", true);
-        delay(1000);
+        delay(2000);
         deepSleep();
+    }
+
+    if ( snapshot ) {
+        client.publish(mqttTopicSnapshot, "off", true);
+        if ( debugMode ) client.publish("mailcam/mail", "snapshot");
+        take_send_photo();
+        if ( debugMode ) client.publish(mqttTopicDebug, "Photo and sleep");
+        delay(2000);
     }
 
     if ( !arrivalOpen && !emptyOpen ) {
         if ( debugMode ) client.publish(mqttTopicDebug, "To sleep");
-        delay(1000);
+        delay(2000);
         deepSleep();
     }
 }
