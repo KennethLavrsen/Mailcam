@@ -11,7 +11,7 @@ The image is taken a few seconds after the switch is activated. A white LED is t
 
 Note that you need to hack your boards.txt file in Arduino for the software to compile. It is described in the .ino file
 
-You need a webserver that runs PHP to receive the file
+You need a webserver that runs PHP to receive the file. The php program is simple and you find it in the initial comments in the .ino file
 
 Secrets are in secrets-mailcam.h
 
