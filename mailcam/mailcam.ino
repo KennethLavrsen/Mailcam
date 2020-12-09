@@ -51,9 +51,9 @@ In a PHP script on webserver have this simple program mailcam.php
 #include "driver/rtc_io.h"
 #include "soc/soc.h"           // Disable brownout problems
 #include "soc/rtc_cntl_reg.h"  // Disable brownout problems
-#include "driver/adc.h"        // Extra cover by butt in deepsleep sub
-#include <esp_wifi.h>          // Extra cover by butt in deepsleep sub
-#include <esp_bt.h>            // Extra cover by butt in deepsleep sub
+#include "driver/adc.h"        // Extra cover my butt in deepsleep sub
+#include <esp_wifi.h>          // Extra cover my butt in deepsleep sub
+#include <esp_bt.h>            // Extra cover my butt in deepsleep sub
 #include "secrets-mailcam.h"
 
 /****** All the configuration happens here ******/
@@ -87,7 +87,7 @@ const char *post_url = MAILCAM_URL;
 
 // Define debug and normal wakeup intervals
 #define REPORT_INTERVAL_DEBUG   1200  /* Debug interval is 20 minutes */
-#define REPORT_INTERVAL_NORMAL  7200  /* Normal interval is 2 hours */
+#define REPORT_INTERVAL_NORMAL  3600  /* Normal interval is 1 hour */
 
 // CAMERA_MODEL_AI_THINKER
 #define PWDN_GPIO_NUM     32
@@ -121,10 +121,13 @@ const char *post_url = MAILCAM_URL;
 
 bool internet_connected = false;
 unsigned long mqttReconnectTimer = 0;
+unsigned long bootTimer = 0;
+
 bool debugMode = false;
 bool arrivalOpen = false;
 bool emptyOpen = false;
 bool snapshot = false;
+bool snapshotTopicRead = false;
 long current_millis;
 long last_capture_millis = 0;
 RTC_DATA_ATTR uint32_t bootCount = 0; //times restarted
@@ -296,6 +299,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     for (int i = 0; i < length; i++) message[i] = (char)payload[i];
     
     message[length] = '\0';
+
+    if ( strcmp(topicCopy, mqttTopicSnapshot) == 0 ) {
+        snapshotTopicRead = true;
+        if ( strcmp(message, "on") == 0 ) {
+            snapshot = true;
+        }
+    }
   
     if ( strcmp(topicCopy, mqttTopicDebugSet) == 0 ) {
         if ( strcmp(message, "on") == 0 ) {
@@ -311,12 +321,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     if ( strcmp(topicCopy, mqttTopicReset) == 0 ) {
         if ( strcmp(message, "reset") == 0 ) {
             ESP.restart();
-        }
-    }
-
-    if ( strcmp(topicCopy, mqttTopicSnapshot) == 0 ) {
-        if ( strcmp(message, "on") == 0 ) {
-            snapshot = true;
         }
     }
 
@@ -378,6 +382,8 @@ static esp_err_t take_send_photo(void)
 void loop()
 {
 
+    unsigned long currentTime = millis();
+    
     if (WiFi.status() != WL_CONNECTED) {
         setup_wifi();
         return;
@@ -386,7 +392,6 @@ void loop()
     ArduinoOTA.handle();
 
     if (!client.connected()) {
-        unsigned long currentTime = millis();
         if ( currentTime - mqttReconnectTimer > 5000 ) {
             mqttReconnectTimer = currentTime;
             if ( mqttConnect() ) {
@@ -418,15 +423,17 @@ void loop()
 
     if ( snapshot ) {
         client.publish(mqttTopicSnapshot, "off", true);
-        if ( debugMode ) client.publish("mailcam/mail", "snapshot");
+        snapshot = false;
         take_send_photo();
         if ( debugMode ) client.publish(mqttTopicDebug, "Photo and sleep");
         delay(2000);
     }
 
     if ( !arrivalOpen && !emptyOpen ) {
-        if ( debugMode ) client.publish(mqttTopicDebug, "To sleep");
-        delay(2000);
-        deepSleep();
+        if ( snapshotTopicRead || currentTime - bootTimer > 5000 ) {
+            if ( debugMode ) client.publish(mqttTopicDebug, "To sleep");
+            delay(2000);
+            deepSleep();
+        }
     }
 }
